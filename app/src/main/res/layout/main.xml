@@ -20,11 +20,14 @@
     android:layout_height="match_parent"
     android:orientation="horizontal">
 
-    <SurfaceView
+    <LinearLayout
+        android:orientation="horizontal"
         android:id="@+id/surface"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:background="#008888"
+        />
 
     <Button
         android:id="@+id/toggle"

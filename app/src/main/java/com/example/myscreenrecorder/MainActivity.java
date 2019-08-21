@@ -5,6 +5,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Matrix;
+import android.graphics.SurfaceTexture;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.projection.MediaProjection;
@@ -12,21 +14,26 @@ import android.media.projection.MediaProjectionManager;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Display;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, SurfaceHolder.Callback {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static String TAG = "MyRecord";
     private Surface mSurface;
     private MediaProjection mMediaProjection;
     private VirtualDisplay mVirtualDisplay;
     private MediaProjectionManager mMediaProjectionManager;
     private Button mButtonToggle;
-    private SurfaceView mSurfaceView;
+    //private SurfaceView mSurfaceView;
 
     private int mResultCode;
     private Intent mResultData;
@@ -38,6 +45,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private static final int REQUEST_MEDIA_PROJECTION = 1;
 
+    private DisplayMetrics dm;
+    TextureView mTextureView;
+    ViewGroup root;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -48,15 +59,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         setContentView(R.layout.main);
 
-        mSurfaceView = (SurfaceView) findViewById(R.id.surface);
-        mSurfaceView.getHolder().addCallback(this);
-
-        mSurface = mSurfaceView.getHolder().getSurface();
-
+        root = (ViewGroup) findViewById(R.id.surface);
+        mTextureView = new TextureView(this);
+        mTextureView.setLayoutParams(new ViewGroup.LayoutParams(1080, 1920));
+        mTextureView.setSurfaceTextureListener(textureCallback);
+        root.addView(mTextureView);
 
         DisplayMetrics metrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(metrics);
         mScreenDensity = metrics.densityDpi;
+
+        WindowManager windowManager = getWindowManager();
+        Display display = windowManager.getDefaultDisplay();
+        dm = new DisplayMetrics();
+        display.getRealMetrics(dm);
 
         mMediaProjectionManager = (MediaProjectionManager)
                 getSystemService(Context.MEDIA_PROJECTION_SERVICE);
@@ -108,6 +124,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    private void updateTextureViewSize(int viewWidth, int viewHeight) {
+        float scaleX = 1.0f;
+        float scaleY = 1.0f;
+
+        // Calculate pivot points, in our case crop from center
+        int pivotPointX = viewWidth / 2;
+        int pivotPointY = viewHeight / 2;
+
+        Matrix matrix = new Matrix();
+        matrix.setScale(scaleX, scaleY, pivotPointX, pivotPointY);
+
+        mTextureView.setTransform(matrix);
+        mTextureView.setLayoutParams(new LinearLayout.LayoutParams(viewWidth, viewHeight));
+    }
+
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
@@ -127,10 +158,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void setUpVirtualDisplay() {
         Log.i(TAG, "Setting up a VirtualDisplay: " +
-                mSurfaceView.getWidth() + "x" + mSurfaceView.getHeight() +
+                dm.widthPixels + "x" + dm.heightPixels +
                 " (" + mScreenDensity + ")");
         mVirtualDisplay = mMediaProjection.createVirtualDisplay("ScreenCapture",
-                mSurfaceView.getWidth(), mSurfaceView.getHeight(), mScreenDensity,
+                root.getWidth(), root.getHeight(), mScreenDensity,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 mSurface, null, null);
         mButtonToggle.setText(R.string.stop);
@@ -143,24 +174,36 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        tearDownMediaProjection();
-    }
+    private TextureCallback textureCallback = new TextureCallback();
 
-    @Override
-    public void surfaceCreated(SurfaceHolder surfaceHolder) {
-        int x = 100;
-    }
+    class TextureCallback implements TextureView.SurfaceTextureListener {
 
-    @Override
-    public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
-        int x = 100;
-    }
 
-    @Override
-    public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
-        int x = 100;
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
+            Log.i(TAG, "surfaceCreated:" + width + ":" + height);
+            //updateTextureViewSize(100, 1920);
+            mSurface = new Surface(surfaceTexture);
+
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+            Log.d(TAG, "surface size changed");
+        }
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+
+            Log.i(TAG, "surfaceDestroyed");
+
+
+            return false;
+        }
+
+        @Override
+        public void onSurfaceTextureUpdated(SurfaceTexture mSurface) {
+            //Log.d(TAG,"surface update");
+        }
     }
 }
